@@ -1,0 +1,40 @@
+name: basic_cleaning
+conda_env: conda.yml
+
+entry_points:
+  main:
+    parameters:
+
+      input_artifact:
+        description: Raw data, comes in as a .csv
+        type: string
+
+      output_artifact:
+        description: Cleaned data, removed outliers
+        type: string
+
+      output_type:
+        description: Artifact
+        type: string
+
+      output_description:
+        description: Cleaned NYC Airbnb data with outliers removed and price filtered
+        type: string
+
+      min_price:
+        description: the min price of the air bnb
+        type: float
+
+      max_price:
+        description: them max price of the air bnb
+        type: float
+
+
+    command: >-
+      python run.py
+      --input_artifact {input_artifact}
+      --output_artifact {output_artifact}
+      --output_type {output_type}
+      --output_description {output_description}
+      --min_price {min_price}
+      --max_price {max_price}
