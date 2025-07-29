@@ -598,3 +598,6 @@ Please, make sure all steps are using **the same** python version and that you h
 ## License
 
 [License](LICENSE.txt)
+
+
+# [Link to project on WANDB](https://wandb.ai/barbaraj-null/nyc_airbnb)
