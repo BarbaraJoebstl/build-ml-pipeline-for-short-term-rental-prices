@@ -7,8 +7,8 @@ import argparse
 import logging
 import os
 import shutil
-import tempfile
 import matplotlib.pyplot as plt
+from mlflow.models.signature import infer_signature
 
 import mlflow
 import json
@@ -44,94 +44,84 @@ def go(args):
     run = wandb.init(job_type="train_random_forest")
     run.config.update(args)
 
-    # Get the Random Forest configuration and update W&B
+    # Load Random Forest config from JSON
     with open(args.rf_config) as fp:
         rf_config = json.load(fp)
     run.config.update(rf_config)
 
-    # Fix the random seed for the Random Forest, so we get reproducible results
+    # Set seed
     rf_config["random_state"] = args.random_seed
 
-    # Use run.use_artifact(...).file() to get the train and validation artifact (args.trainval_artifact)
-    # and save the returned path in train_local_pat
+    # Download and load train/val dataset
     trainval_local_path = run.use_artifact(args.trainval_artifact).file()
-
     X = pd.read_csv(trainval_local_path)
-    y = X.pop("price")  # this removes the column "price" from X and puts it into y
+    y = X.pop("price")
 
     logger.info(f"Minimum price: {y.min()}, Maximum price: {y.max()}")
 
+    # Train-validation split
     X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=args.val_size, stratify=X[args.stratify_by], random_state=args.random_seed
+        X,
+        y,
+        test_size=args.val_size,
+        stratify=X[args.stratify_by],
+        random_state=args.random_seed,
     )
 
     logger.info("Preparing sklearn pipeline")
-
     sk_pipe, processed_features = get_inference_pipeline(rf_config, args.max_tfidf_features)
 
-    # Then fit it to the X_train, y_train data
-    logger.info("Fitting")
-
-    # Fit the pipeline sk_pipe by calling the .fit method on X_train and y_train
+    # Train model
+    logger.info("Fitting model")
     sk_pipe.fit(X_train, y_train)
 
-    # Compute r2 and MAE
-    logger.info("Scoring")
+    # Evaluate model
+    logger.info("Scoring model")
     r_squared = sk_pipe.score(X_val, y_val)
-
     y_pred = sk_pipe.predict(X_val)
     mae = mean_absolute_error(y_val, y_pred)
 
-    logger.info(f"Score: {r_squared}")
+    logger.info(f"Score (R^2): {r_squared}")
     logger.info(f"MAE: {mae}")
 
+    # Save model
     logger.info("Exporting model")
 
-    # Save model package in the MLFlow sklearn format
-    if os.path.exists("random_forest_dir"):
-        shutil.rmtree("random_forest_dir")
+    export_dir = "random_forest_dir"
+    if os.path.exists(export_dir):
+        shutil.rmtree(export_dir)
 
-    # Save the sk_pipe pipeline as a mlflow.sklearn model in the directory "random_forest_dir"
-    with tempfile.TemporaryDirectory() as temp_dir:
-        signature = mlflow.models.infer_signature(X_val, y_pred)
-        export_path = os.path.join(temp_dir, "model_export")
-        mlflow.sklearn.save_model(
-            sk_pipe,
-            export_path,
-            serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
-            signature=signature,
-            input_example=X_val.iloc[:5],
-        )
+    # Fix object columns for signature
+    X_val_fixed = X_val.copy()
+    for col in X_val_fixed.select_dtypes(include="object").columns:
+        X_val_fixed[col] = X_val_fixed[col].astype(str)
 
-        # Upload the model we just exported to W&B
-        # HINT: use wandb.Artifact to create an artifact. Use args.output_artifact as artifact name, "model_export" as
-        # type, provide a description and add rf_config as metadata. Then, use the .add_dir method of the artifact # instance
-        # you just created to add the "random_forest_dir" directory to the artifact, and finally use
-        # run.log_artifact to log the artifact to the run
-        artifact = wandb.Artifact(
-            args.output_artifact,
-            type="model_export",
-            description="Random Forest pipeline export",
-        )
-        artifact.add_dir(export_path)
+    signature = infer_signature(X_val_fixed, y_pred)
 
-        run.log_artifact(artifact)
-        artifact.wait()
+    mlflow.sklearn.save_model(
+        sk_model=sk_pipe,
+        path=export_dir,
+        input_example=X_val_fixed.iloc[:5],
+        signature=signature,
+        serialization_format="cloudpickle",
+    )
 
-    # Plot feature importance
-    fig_feat_imp = plot_feature_importance(sk_pipe, processed_features)
+    # Log model artifact to W&B
+    artifact = wandb.Artifact(
+        name=args.output_artifact,
+        type="model_export",
+        description="Random Forest pipeline export",
+        metadata=rf_config,
+    )
+    artifact.add_dir(export_dir)
+    run.log_artifact(artifact)
 
-    # Here we save r_squared under the "r2" key
+    # Log evaluation metrics and feature importance
     run.summary["r2"] = r_squared
-    # Now log the variable "mae" under the key "mae".
     run.summary["mae"] = mae
 
-    # Upload to W&B the feture importance visualization
-    run.log(
-        {
-            "feature_importance": wandb.Image(fig_feat_imp),
-        }
-    )
+    fig_feat_imp = plot_feature_importance(sk_pipe, processed_features)
+    run.log({"feature_importance": wandb.Image(fig_feat_imp)})
 
 
 def plot_feature_importance(pipe, feat_names):

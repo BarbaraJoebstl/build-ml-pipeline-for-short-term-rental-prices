@@ -4,7 +4,6 @@ import scipy.stats
 
 # if only this step should be executed
 # run with  iterm
-  
 
 
 def test_column_names(data):
