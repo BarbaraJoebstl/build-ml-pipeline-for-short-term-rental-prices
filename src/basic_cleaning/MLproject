@@ -1,0 +1,40 @@
+name: basic_cleaning
+conda_env: conda.yml
+
+entry_points:
+  main:
+    parameters:
+
+      input_artifact:
+        description: artifact to use from W&B must be a csv
+        type: string
+        default: sample.csv:latest
+
+      output_artifact:
+        description: cleaned artifact
+        type: string
+        default: clean_sample.csv
+
+      output_type:
+        description: cleaned data artifact
+        type: string
+        default: cleaned data artifact
+
+      output_description:
+        description: cleaned artifact
+        type: string
+        default: cleaned version of the raw data
+
+      min_price:
+        description: min price for the housing
+        type: string
+        default: 10
+
+      max_price:
+        description: max price for the housing
+        type: string
+        default: 350
+
+
+    command: >-
+        python run.py  --input_artifact {input_artifact}  --output_artifact {output_artifact}  --output_type {output_type}  --output_description {output_description}  --min_price {min_price}  --max_price {max_price} 
