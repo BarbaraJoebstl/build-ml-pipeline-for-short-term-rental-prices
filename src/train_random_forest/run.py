@@ -190,6 +190,8 @@ def get_inference_pipeline(rf_config, max_tfidf_features):
         "number_of_reviews",
         "calculated_host_listings_count",
         "availability_365",
+        "longitude",
+        "latitude",
     ]
     zero_imputer = SimpleImputer(strategy="constant", fill_value=0)
 

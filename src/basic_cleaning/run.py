@@ -33,9 +33,6 @@ def go(args):
     idx = df["price"].between(args.min_price, args.max_price)
     df = df[idx].copy()
 
-    # drop columns with high correlation (number of reviews, neighbourhodd group)
-    df.drop(columns=["reviews_per_month", "latitude", "longitude"], inplace=True)
-
     logger.info("store cleaned artifact as csv")
     # store cleaned artifact
     df.to_csv("clean_sample.csv", index=False)

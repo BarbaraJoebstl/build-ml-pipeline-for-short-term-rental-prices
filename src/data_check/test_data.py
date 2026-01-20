@@ -5,17 +5,20 @@ import pytest
 
 
 def test_column_names(data):
-    expected_colums = [
+    expected_columns = [
         "id",
         "name",
         "host_id",
         "host_name",
         "neighbourhood_group",
         "neighbourhood",
+        "latitude",
+        "longitude",
         "room_type",
         "price",
         "minimum_nights",
         "number_of_reviews",
+        "reviews_per_month",
         "last_review",
         "calculated_host_listings_count",
         "availability_365",
@@ -24,7 +27,7 @@ def test_column_names(data):
     these_columns = data.columns.to_numpy()  # Using to_numpy() for better performance
 
     # This also enforces the same order
-    assert np.array_equal(expected_colums, these_columns)  # Using numpy comparison for better performance
+    assert sorted(these_columns) == sorted(expected_columns)
 
 
 def test_neighborhood_names(data):
@@ -36,7 +39,6 @@ def test_neighborhood_names(data):
     assert set(known_names) == set(neigh)
 
 
-@pytest.mark.skip(reason="We are currently not using longitude")
 def test_proper_boundaries(data: pd.DataFrame):
     """
     Test proper longitude and latitude boundaries for properties in and around NYC
